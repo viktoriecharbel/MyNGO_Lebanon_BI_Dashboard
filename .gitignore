@@ -1,0 +1,19 @@
+# Virtual environment
+scripts/venv/
+venv/
+.venv
+
+# Python cache
+__pycache__/
+*.pyc
+
+# OS junk
+.DS_Store
+Thumbs.db
+
+# PyCharm project files
+.idea/
+
+# Data files - excluded, regenerate via scripts (see README)
+data/raw/
+data/clean/
