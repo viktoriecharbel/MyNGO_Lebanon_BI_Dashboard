@@ -23,4 +23,4 @@ The dashboard will help programme managers understand:
 
 Fictional humanitarian organisation operating in Lebanon.
 
-Public humanitarian datasets are combined with simulated operational programme data.
+Public humanitarian datasets (IMPACT MSNA Lebanon and population data) are combined with simulated operational programme data.
