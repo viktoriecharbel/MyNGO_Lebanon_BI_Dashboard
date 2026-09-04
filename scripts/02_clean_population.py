@@ -16,7 +16,7 @@ DATA_PATH = BASE_DIR / "data" / "raw" / "population.xlsx"
 #######----- FUNCTIONS  ------ ####
 def clean_population_summary():
     """
-    Load the district-level table from 'ALL POPULATION SUMMARY', unpivot the 2025/2025 paired columns into a Year column,
+    Load the district-level table from 'ALL POPULATION SUMMARY', unpivot the 2025/2026 paired columns into a Year column,
     clean dash-as-missing values, and return a tidy long-format dataframe for Power BI use
     """
 
@@ -90,10 +90,56 @@ def clean_population_summary():
 
     return full_df
 
+
+def clean_age_pyramid_sheet(sheet_name, header_row, total_col, female_col, male_col):
+    """
+    Load one nationality's age/sex pyramid sheet (district-level), and reshape the age-band columns from wide format
+    into tidy long format.
+
+    :param sheet_name: str
+    :param header_row: int, starting from which header to reach district level data;
+    :param total_col: str, name of the column concerning the total population;
+    :param female_col: str, name of the column regarding all female;
+    :param male_col: str, name of the column regarding all male
+    :return: long_df
+    """
+
+    df = pd.read_excel(DATA_PATH, sheet_name=sheet_name, header=header_row)
+    df = df[df["Governorate"].notna() & df["District"].notna()].reset_index(drop=True)
+
+
+    id_cols = ['Governorate', 'District', total_col, 'Distribution %', female_col, male_col]
+    age_cols = ['  Age\n 0 - 4', '  5 - 9', '10 - 14', '15 - 19', '20 - 24', '25 - 29', '30 - 34', '35 - 39', '40 - 44',
+                '45 - 49', '50 - 54', '55 - 59', '60 - 64', '65 - 69', '70 - 74', '75 - 79', '80 - 84', '85 and above']
+
+    numeric_cols = [total_col, female_col, male_col] + age_cols
+    df[numeric_cols] = df[numeric_cols].astype(int)
+    long_df = df.melt(
+        id_vars=id_cols,
+        value_vars=age_cols,
+        var_name="Age Group",
+        value_name="Population"
+    )
+
+    long_df["Age Group"] = long_df["Age Group"].str.replace("Age", "", regex=False)
+    long_df["Age Group"] = long_df["Age Group"].str.replace(" and above", "+", regex=False)
+    long_df["Age Group"] = long_df["Age Group"].str.strip()
+    long_df["Age Group"] = long_df["Age Group"].str.replace(r"\s*-\s*", "-", regex=True)
+
+    return long_df
 ##### ---- CREATING CLEAN POWERBI READY CSVs -----######
+
 if __name__ == "__main__":
     population_summary_clean = clean_population_summary()
 
-    OUTPUT_PATH = BASE_DIR / "data" / "clean" / "population_summary_clean.csv"
-    population_summary_clean.to_csv(OUTPUT_PATH, index=False)
-    print(f"Saved to {OUTPUT_PATH}")
+    leb_long = clean_age_pyramid_sheet(sheet_name="LEBANESE", header_row=13, total_col="TOTAL LEBANESE",
+                                       female_col="All Lebanese Female", male_col="All Lebanese Male")
+
+    syr_long = clean_age_pyramid_sheet(sheet_name="SYRIAN", header_row=13, total_col="Syrian_Est",
+                                       female_col="All Syrians Female", male_col="All Syrians Male")
+
+    population_summary_clean.to_csv(BASE_DIR / "data" / "clean" / "population_summary_clean.csv", index=False)
+    leb_long.to_csv(BASE_DIR / "data" / "clean" / "lebanese_age_pyramid_clean.csv", index=False)
+    syr_long.to_csv(BASE_DIR / "data" / "clean" / "syrian_age_pyramid_clean.csv", index=False)
+    print("Saved: population_summary_clean.csv, lebanese_age_pyramid_clean.csv, syrian_age_pyramid_clean.csv")
+
