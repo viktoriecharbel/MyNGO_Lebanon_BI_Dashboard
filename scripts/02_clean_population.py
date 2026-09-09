@@ -141,6 +141,53 @@ def clean_age_pyramid_sheet(sheet_name, header_row, total_col, female_col, male_
     long_df["Age Group"] = long_df["Age Group"].str.replace(r"\s*-\s*", "-", regex=True)
 
     return long_df
+
+def clean_migrants_sheet():
+    """
+    Load the district-level table from 'Migrants', split the age/sex category columns (Boys/Girls/Men/Women) into separate
+    Age Group and Sex columns, and return a tidy long-format dataframe for PowerBI
+    :return: long_df
+
+    """
+    df = pd.read_excel(DATA_PATH, sheet_name="Migrants", header=13)
+    df.columns = df.columns.str.strip()
+    df = df[
+        df["Governorate"].notna() & df["District"].notna()].reset_index(drop=True)
+
+    mig_long = df.melt(
+        id_vars=['Governorate', 'District', 'Total Number of Migrants', 'Migrants (%)', 'All Migrants Female',
+                 'All Migrants Male'],
+        value_vars=['Migrant Boys', 'Migrant Girls', 'Migrant Men', 'Migrant Women'],
+        var_name="Category",
+        value_name="Population"
+    )
+
+    age_group_map = {
+        "Migrant Boys": "Child",
+        "Migrant Girls": "Child",
+        "Migrant Men": "Adult",
+        "Migrant Women": "Adult"
+    }
+
+    sex_group_map = {
+        "Migrant Boys": "Male",
+        "Migrant Girls": "Female",
+        "Migrant Men": "Male",
+        "Migrant Women": "Female"
+    }
+
+    mig_long["Age Group"] = mig_long["Category"].map(age_group_map)
+    mig_long["Sex"] = mig_long["Category"].map(sex_group_map)
+    mig_long = mig_long.drop(columns=["Category"])
+
+    mig_long = mig_long[['Governorate', 'District', 'Total Number of Migrants', 'Migrants (%)', 'All Migrants Female',
+                         'All Migrants Male', 'Age Group', 'Sex', 'Population']]
+
+    numeric_cols = ['Total Number of Migrants', 'All Migrants Female', 'All Migrants Male', 'Population']
+    mig_long[numeric_cols] = mig_long[numeric_cols].astype(int)
+
+    return mig_long
+
 ##### ---- CREATING CLEAN POWERBI READY CSVs -----######
 
 if __name__ == "__main__":
@@ -160,9 +207,11 @@ if __name__ == "__main__":
                                        extra_cols=['PRL - Camps Population', 'PRL - Gatherings Population', 'Total PRL',
                                                    'PRS in Camps', 'PRS outside Camps', 'Total PRS'])
 
+    migrants_clean = clean_migrants_sheet()
+
     combined_pyramid = pd.concat([leb_long, syr_long, pal_long], ignore_index=True)
 
     population_summary_clean.to_csv(BASE_DIR / "data" / "clean" / "population_summary_clean.csv", index=False)
     combined_pyramid.to_csv(BASE_DIR / "data" / "clean" / "population_age_pyramid_clean.csv", index=False)
-    print("Saved: population_summary_clean.csv, population_age_pyramid_clean.csv")
-
+    migrants_clean.to_csv(BASE_DIR / "data" / "clean" / "migrants_clean.csv", index=False)
+    print("Saved: population_summary_clean.csv, population_age_pyramid_clean.csv, migrants_clean.csv")
