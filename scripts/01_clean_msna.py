@@ -2,31 +2,22 @@
 from pathlib import Path
 import pandas as pd
 
-
 #####---- INITIAL FORMATTING & ORIENTATION --- #####
 pd.set_option("display.max_columns", None)
 pd.set_option("display.width", None)
 
-## To Check the cwd
-# import os
-# print("Current working directory:", os.getcwd())
-# print("Files here:", os.listdir())
-
 ####### ----- DIRECTING TO THE CORRECT PATH ------ #######
 
-# Project root = one level up from this script's folder (scripts/ -> project root)
 BASE_DIR = Path(__file__).resolve().parent.parent
 DATA_PATH = BASE_DIR / "data" / "raw" / "msna.xlsx"
-# print("Looking for file at:", DATA_PATH)
-# print("Exists?", DATA_PATH.exists())
 
 #########----- FUNCTIONS -------- #######
 def clean_sector_sheet(sheet_name):
     """
     Load one MSNA sector sheet and reshape it from wide format (one column per disaggregation) into tidy long format
     (one row per indicator x disaggregation combination).
-    :param sheet_name:
-    :return: long_df
+    :param sheet_name: str, name of the MSNA sector sheet to load adn clean
+    :return: long_df, tidy long-format dataframe for this sector
     """
     df = pd.read_excel(DATA_PATH, sheet_name=sheet_name, header=1)
     raw = pd.read_excel(DATA_PATH, sheet_name=sheet_name, header=None, nrows=2)
@@ -48,7 +39,6 @@ def clean_sector_sheet(sheet_name):
     long_df = long_df[["sector", "Indicator ID", "Indicator", "Question", "Answers/Label", "disagg_type", "disagg_value", "value", "key"]]
 
     return long_df
-
 
 ####### ------ CREATING A CLEAN POWERBI READY CSV ------######
 if __name__ == "__main__":
