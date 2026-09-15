@@ -10,7 +10,6 @@ pd.set_option("display.width", None)
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 DATA_PATH = BASE_DIR / "data" / "raw" / "msna.xlsx"
-
 #########----- FUNCTIONS -------- #######
 def clean_sector_sheet(sheet_name):
     """
@@ -35,6 +34,7 @@ def clean_sector_sheet(sheet_name):
     )
 
     long_df["disagg_type"] = long_df["disagg_value"].map(col_to_disagg_type)
+    long_df["value"]= pd.to_numeric(long_df["value"], errors = "coerce").isna()
     long_df = long_df.dropna(subset=["value"])
     long_df = long_df[["sector", "Indicator ID", "Indicator", "Question", "Answers/Label", "disagg_type", "disagg_value", "value", "key"]]
 
@@ -59,6 +59,7 @@ if __name__ == "__main__":
     if not all_sectors:
         raise RuntimeError("No sector sheets were cleaned successfully - check errors above.")
     msna_clean = pd.concat(all_sectors, ignore_index=True)
+
 
     ##### ---- SAVING FILE -----######
     OUTPUT_PATH = BASE_DIR / "data" / "clean" / "msna_clean.csv"
