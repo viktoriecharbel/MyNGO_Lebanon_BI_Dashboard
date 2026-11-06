@@ -8,7 +8,6 @@ pd.set_option("display.width", None)
 BASE_DIR = Path(__file__).resolve().parent.parent
 OUTPUT_DIR = BASE_DIR / "data" / "clean"
 
-
 PROJECTS = [
     {
         "ProjectID": "P01",
@@ -131,6 +130,21 @@ SECTOR_INDICATORS = {
         ]
 }
 
+PROJECT_DISTRICTS = {
+    "P01" : ["Akkar"],
+    "P02" : ["El Hermel", "Baalbek"],
+    "P03" : ["West Bekaa"],
+    "P04" : ["West Bekaa", "Zahle"],
+    "P05" : ["El Hermel"],
+    "P06" : ["Saida"],
+    "P07" : ["West Bekaa"],
+    "P08" : ["Akkar"],
+    "P09" : ["Saida"],
+    "P10" : ["Saida"],
+    "P11" : ["Akkar"],
+    "P12" : ["Saida", "Sour"],
+}
+
 ##### ------ FUNCTIONS------- ###
 def build_projects():
     """
@@ -143,19 +157,20 @@ def build_projects():
 
     return df_projects
 
+
 def build_indicators(df_projects):
     """
-     Creates a dataframe with one row per project indicator: IndicatorID, ProjectID, IndicatorText and CountingUnit
+    Creates a dataframe with one row per project indicator: IndicatorID, ProjectID, IndicatorText and CountingUnit
     :return: df_indicators
     """
     templates = pd.DataFrame(
         [(sector, text, unit)
          for sector, items in SECTOR_INDICATORS.items()
          for text, unit in items],
-        columns=["Sector", "IndicatorText", "CountingUnit"],
+        columns = ["Sector", "IndicatorText", "CountingUnit"],
     )
 
-    df=df_projects[["ProjectID", "Sector"]].merge(templates, on="Sector", how="left")
+    df = df_projects[["ProjectID", "Sector"]].merge(templates, on = "Sector", how = "left")
 
     df["IndicatorID"] = (
         df["ProjectID"] + "-I"
@@ -164,13 +179,32 @@ def build_indicators(df_projects):
     df_indicators = df[["IndicatorID", "ProjectID", "IndicatorText", "CountingUnit"]]
     return df_indicators
 
-###### ----- VALIDATION FUNCTIONS ----- ######
 
-def validate(df_projects, df_indicators):
+def build_targets(df_indicators):
+    """
+        Creates the skeleton of the targets table: one row per indicator and district (IndicatorID, District).
+        TargetValue is added in a later step.
+        :return df_targets
+    """
+    targets = pd.DataFrame(
+        [(project_id, district)
+         for project_id, district_list in PROJECT_DISTRICTS.items()
+         for district in district_list],
+        columns = ["ProjectID","District"]
+    )
+
+    df = df_indicators[["IndicatorID", "ProjectID"]].merge(targets, on = "ProjectID", how = "left")
+    df_targets = df[["IndicatorID", "District"]]
+    return df_targets
+
+
+def validate(df_projects, df_indicators, df_targets, districts_list):
     """Stop script if the tables break any of the following rules."""
-    checks= [
+    checks = [
         (df_projects["ProjectID"].is_unique, "Duplicate ProjectID"),
         (df_indicators["IndicatorID"].is_unique, "Duplicate IndicatorID"),
+        (df_targets["District"].notna().all(), "Target with no district (project missing from PROJECT_DISTRICTS)"),
+        (df_targets["District"].isin(districts_list).all(), "Unknown District"),
         (df_projects["Sector"].isin(list(SECTOR_INDICATORS)).all(), "Sector with no indicator template."),
         (df_indicators["IndicatorText"].notna().all(), "Missing IndicatorText"),
         ((df_projects["EndDate"] > df_projects["StartDate"]).all(), "EndDate is not after StartDate"),
@@ -178,20 +212,28 @@ def validate(df_projects, df_indicators):
         ((df_projects["EndDate"].dt.is_month_end).all(), "EndDate is not a month end"),
         (df_indicators["CountingUnit"].isin([INDIVIDUALS, SERVICES]).all(), "Unknown CountingUnit"),
         (not df_indicators.duplicated(subset=["ProjectID", "IndicatorText"]).any(),
-              "Repeated indicator within a project")
+              "Repeated indicator text within a project"),
+        (not df_targets.duplicated(subset=["IndicatorID", "District"]).any(),
+         "Repeated indicator id and district pair"),
+        (len(set(PROJECT_DISTRICTS) - set(df_projects["ProjectID"])) == 0, "Key in PROJECT_DISTRICTS that is not a real project")
     ]
     failures = [message for passed, message in checks if not passed]
     if failures:
         raise ValueError("Validation failed:\n- " + "\n- ".join(failures))
 
 ######------SCRIPT-------#####
-if __name__ == "__main__":
-    df_projects=build_projects()
-    df_indicators=build_indicators(df_projects)
-    validate(df_projects, df_indicators)
 
-    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-    tables= {"projects": df_projects, "indicators": df_indicators}
+if __name__ == "__main__":
+    # Requires population_summary_clean.csv, which is produced by 02_clean_population.py
+    df_districts = pd.read_csv(OUTPUT_DIR/ "population_summary_clean.csv")
+    districts_list = sorted(df_districts["District"].unique())
+    df_projects = build_projects()
+    df_indicators = build_indicators(df_projects)
+    df_targets = build_targets(df_indicators)
+    validate(df_projects, df_indicators, df_targets, districts_list)
+
+    OUTPUT_DIR.mkdir(parents = True, exist_ok = True)
+    tables = {"projects": df_projects, "indicators": df_indicators, "targets": df_targets}
     for name, df in tables.items():
-        df.to_csv(OUTPUT_DIR / f"{name}.csv", index=False)
+        df.to_csv(OUTPUT_DIR / f"{name}.csv", index = False)
         print(f"Saved {name}.csv ({len(df)} rows)")
